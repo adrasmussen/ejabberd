@@ -70,19 +70,47 @@
 %% External exports
 -export([start_link/1, start_link/6]).
 
--export([baseObject/0, singleLevel/0, wholeSubtree/0,
-	 close/1, equalityMatch/2, greaterOrEqual/2,
-	 lessOrEqual/2, approxMatch/2, search/2, substrings/2,
-	 present/1, extensibleMatch/2, 'and'/1, 'or'/1, 'not'/1,
-	 modify/3, mod_add/2, mod_delete/2, mod_replace/2, add/3,
-	 delete/2, modify_dn/5, modify_passwd/3, bind/3]).
+-export([
+    baseObject/0,
+    singleLevel/0,
+    wholeSubtree/0,
+    close/1,
+    equalityMatch/2,
+    greaterOrEqual/2,
+    lessOrEqual/2,
+    approxMatch/2,
+    search/2,
+    substrings/2,
+    present/1,
+    extensibleMatch/2,
+    'and'/1,
+    'or'/1,
+    'not'/1,
+    modify/3,
+    mod_add/2,
+    mod_delete/2,
+    mod_replace/2,
+    add/3,
+    delete/2,
+    modify_dn/5,
+    modify_passwd/3,
+    bind/3
+]).
 
 -export([get_status/1]).
 
--export([init/1, connecting/2, connecting/3,
-	 wait_bind_response/3, active/3, active_bind/3,
-	 handle_event/3, handle_sync_event/4, handle_info/3,
-	 terminate/3, code_change/4]).
+-export([
+    init/1,
+    connecting/2, connecting/3,
+    wait_bind_response/3,
+    active/3,
+    active_bind/3,
+    handle_event/3,
+    handle_sync_event/4,
+    handle_info/3,
+    terminate/3,
+    code_change/4
+]).
 
 -export_type([filter/0]).
 
@@ -101,7 +129,8 @@
 %% Used as a timeout for gen_tcp:send/2
 
 -define(CALL_TIMEOUT,
-	(?CMD_TIMEOUT) + (?BIND_TIMEOUT) + (?RETRY_TIMEOUT)).
+    (?CMD_TIMEOUT) + (?BIND_TIMEOUT) + (?RETRY_TIMEOUT)
+).
 
 -define(SEND_TIMEOUT, 30000).
 
@@ -113,51 +142,66 @@
 -define(GRACEFUL_RETRY_TIMEOUT, 5000).
 
 -define(SUPPORTEDEXTENSION,
-	<<"1.3.6.1.4.1.1466.101.120.7">>).
+    <<"1.3.6.1.4.1.1466.101.120.7">>
+).
 
 -define(SUPPORTEDEXTENSIONSYNTAX,
-	<<"1.3.6.1.4.1.1466.115.121.1.38">>).
+    <<"1.3.6.1.4.1.1466.115.121.1.38">>
+).
 
 -define(STARTTLS, <<"1.3.6.1.4.1.1466.20037">>).
 
 -type handle() :: pid() | atom() | binary().
 
--record(eldap,
-	{version = ?LDAP_VERSION :: non_neg_integer(),
-         hosts = []              :: [binary()],
-         host = undefined        :: binary() | undefined,
-	 port = 389              :: inet:port_number(),
-         sockmod = gen_tcp       :: ssl | gen_tcp,
-         tls = none              :: none | tls,
-         tls_options = []        :: [{certfile, string()} |
-				     {cacertfile, string()} |
-                                     {depth, non_neg_integer()} |
-                                     {verify, non_neg_integer()} |
-                                     {fail_if_no_peer_cert, boolean()}],
-	 fd                      :: gen_tcp:socket() | undefined,
-         rootdn = <<"">>         :: binary(),
-         passwd = <<"">>         :: binary(),
-         id = 0                  :: non_neg_integer(),
-         bind_timer = make_ref() :: reference(),
-	 dict = dict:new()       :: dict:dict(),
-         req_q = queue:new()     :: queue:queue()}).
+-record(eldap, {
+    version = ?LDAP_VERSION :: non_neg_integer(),
+    hosts = [] :: [binary()],
+    host = undefined :: binary() | undefined,
+    port = 389 :: inet:port_number(),
+    sockmod = gen_tcp :: ssl | gen_tcp,
+    tls = none :: none | tls,
+    tls_options = [] :: [
+        {certfile, string()}
+        | {cacertfile, string()}
+        | {depth, non_neg_integer()}
+        | {verify, non_neg_integer()}
+        | {fail_if_no_peer_cert, boolean()}
+    ],
+    fd :: gen_tcp:socket() | undefined,
+    rootdn = <<"">> :: binary(),
+    passwd = <<"">> :: binary(),
+    id = 0 :: non_neg_integer(),
+    bind_timer = make_ref() :: reference(),
+    dict = dict:new() :: dict:dict(),
+    req_q = queue:new() :: queue:queue(),
+    bind :: simple | sasl,
+    krb = undefined :: pid() | undefined
+}).
 
 %%%----------------------------------------------------------------------
 %%% API
 %%%----------------------------------------------------------------------
 start_link(Name) ->
-    Reg_name = misc:binary_to_atom(<<"eldap_",
-				       Name/binary>>),
+    Reg_name = misc:binary_to_atom(<<"eldap_", Name/binary>>),
     p1_fsm:start_link({local, Reg_name}, ?MODULE, [], []).
 
--spec start_link(binary(), [binary()], inet:port_number(), binary(),
-                 binary(), tlsopts()) -> any().
+-spec start_link(
+    binary(),
+    [binary()],
+    inet:port_number(),
+    binary(),
+    binary(),
+    tlsopts()
+) -> any().
 
 start_link(Name, Hosts, Port, Rootdn, Passwd, Opts) ->
-    Reg_name = misc:binary_to_atom(<<"eldap_",
-				       Name/binary>>),
-    p1_fsm:start_link({local, Reg_name}, ?MODULE,
-		       [Hosts, Port, Rootdn, Passwd, Opts], []).
+    Reg_name = misc:binary_to_atom(<<"eldap_", Name/binary>>),
+    p1_fsm:start_link(
+        {local, Reg_name},
+        ?MODULE,
+        [Hosts, Port, Rootdn, Passwd, Opts],
+        []
+    ).
 
 -spec get_status(handle()) -> any().
 
@@ -192,17 +236,20 @@ close(Handle) ->
 %%% --------------------------------------------------------------------
 add(Handle, Entry, Attributes) ->
     Handle1 = get_handle(Handle),
-    p1_fsm:sync_send_event(Handle1,
-			    {add, Entry, add_attrs(Attributes)}, ?CALL_TIMEOUT).
+    p1_fsm:sync_send_event(
+        Handle1,
+        {add, Entry, add_attrs(Attributes)},
+        ?CALL_TIMEOUT
+    ).
 
 %%% Do sanity check !
 add_attrs(Attrs) ->
-    F = fun ({Type, Vals}) ->
-		{'AddRequest_attributes', Type, Vals}
-	end,
+    F = fun({Type, Vals}) ->
+        {'AddRequest_attributes', Type, Vals}
+    end,
     case catch lists:map(F, Attrs) of
-      {'EXIT', _} -> throw({error, attribute_values});
-      Else -> Else
+        {'EXIT', _} -> throw({error, attribute_values});
+        Else -> Else
     end.
 
 %%% --------------------------------------------------------------------
@@ -216,8 +263,11 @@ add_attrs(Attrs) ->
 %%% --------------------------------------------------------------------
 delete(Handle, Entry) ->
     Handle1 = get_handle(Handle),
-    p1_fsm:sync_send_event(Handle1, {delete, Entry},
-			    ?CALL_TIMEOUT).
+    p1_fsm:sync_send_event(
+        Handle1,
+        {delete, Entry},
+        ?CALL_TIMEOUT
+    ).
 
 %%% --------------------------------------------------------------------
 %%% Modify an entry. Given an entry a number of modification
@@ -234,8 +284,11 @@ delete(Handle, Entry) ->
 
 modify(Handle, Object, Mods) ->
     Handle1 = get_handle(Handle),
-    p1_fsm:sync_send_event(Handle1, {modify, Object, Mods},
-			    ?CALL_TIMEOUT).
+    p1_fsm:sync_send_event(
+        Handle1,
+        {modify, Object, Mods},
+        ?CALL_TIMEOUT
+    ).
 
 %%%
 %%% Modification operations.
@@ -264,27 +317,35 @@ mod_replace(Type, Values) ->
     m(replace, Type, Values).
 
 m(Operation, Type, Values) ->
-    #'ModifyRequest_modification_SEQOF'{operation =
-					    Operation,
-					modification =
-					    #'AttributeTypeAndValues'{type =
-									  Type,
-								      vals =
-									  Values}}.
+    #'ModifyRequest_modification_SEQOF'{
+        operation =
+            Operation,
+        modification =
+            #'AttributeTypeAndValues'{
+                type =
+                    Type,
+                vals =
+                    Values
+            }
+    }.
 
 modify_dn(Handle, Entry, NewRDN, DelOldRDN, NewSup) ->
     Handle1 = get_handle(Handle),
-    p1_fsm:sync_send_event(Handle1,
-			    {modify_dn, Entry, NewRDN, bool_p(DelOldRDN),
-			     optional(NewSup)},
-			    ?CALL_TIMEOUT).
+    p1_fsm:sync_send_event(
+        Handle1,
+        {modify_dn, Entry, NewRDN, bool_p(DelOldRDN), optional(NewSup)},
+        ?CALL_TIMEOUT
+    ).
 
 -spec modify_passwd(handle(), binary(), binary()) -> any().
 
 modify_passwd(Handle, DN, Passwd) ->
     Handle1 = get_handle(Handle),
-    p1_fsm:sync_send_event(Handle1,
-			    {modify_passwd, DN, Passwd}, ?CALL_TIMEOUT).
+    p1_fsm:sync_send_event(
+        Handle1,
+        {modify_passwd, DN, Passwd},
+        ?CALL_TIMEOUT
+    ).
 
 %%% --------------------------------------------------------------------
 %%% Bind.
@@ -298,8 +359,11 @@ modify_passwd(Handle, DN, Passwd) ->
 
 bind(Handle, RootDN, Passwd) ->
     Handle1 = get_handle(Handle),
-    p1_fsm:sync_send_event(Handle1, {bind, RootDN, Passwd},
-			    ?CALL_TIMEOUT).
+    p1_fsm:sync_send_event(
+        Handle1,
+        {bind, RootDN, Passwd},
+        ?CALL_TIMEOUT
+    ).
 
 %%% Sanity checks !
 
@@ -333,14 +397,16 @@ optional(Value) -> Value.
 %%%        []}}
 %%%
 %%% --------------------------------------------------------------------
--type search_args() :: [{base, binary()} |
-                        {filter, filter()} |
-                        {scope, scope()} |
-                        {attributes, [binary()]} |
-                        {types_only, boolean()} |
-                        {timeout, non_neg_integer()} |
-                        {limit, non_neg_integer()} |
-                        {deref_aliases, never | searching | finding | always}].
+-type search_args() :: [
+    {base, binary()}
+    | {filter, filter()}
+    | {scope, scope()}
+    | {attributes, [binary()]}
+    | {types_only, boolean()}
+    | {timeout, non_neg_integer()}
+    | {limit, non_neg_integer()}
+    | {deref_aliases, never | searching | finding | always}
+].
 
 -spec search(handle(), eldap_search() | search_args()) -> any().
 
@@ -348,22 +414,29 @@ search(Handle, A) when is_record(A, eldap_search) ->
     call_search(Handle, A);
 search(Handle, L) when is_list(L) ->
     case catch parse_search_args(L) of
-      {error, Emsg} -> {error, Emsg};
-      {'EXIT', Emsg} -> {error, Emsg};
-      A when is_record(A, eldap_search) ->
-	  call_search(Handle, A)
+        {error, Emsg} ->
+            {error, Emsg};
+        {'EXIT', Emsg} ->
+            {error, Emsg};
+        A when is_record(A, eldap_search) ->
+            call_search(Handle, A)
     end.
 
 call_search(Handle, A) ->
     Handle1 = get_handle(Handle),
-    p1_fsm:sync_send_event(Handle1, {search, A},
-			    ?CALL_TIMEOUT).
+    p1_fsm:sync_send_event(
+        Handle1,
+        {search, A},
+        ?CALL_TIMEOUT
+    ).
 
 -spec parse_search_args(search_args()) -> eldap_search().
 
 parse_search_args(Args) ->
-    parse_search_args(Args,
-		      #eldap_search{scope = wholeSubtree}).
+    parse_search_args(
+        Args,
+        #eldap_search{scope = wholeSubtree}
+    ).
 
 parse_search_args([{base, Base} | T], A) ->
     parse_search_args(T, A#eldap_search{base = Base});
@@ -372,33 +445,50 @@ parse_search_args([{filter, Filter} | T], A) ->
 parse_search_args([{scope, Scope} | T], A) ->
     parse_search_args(T, A#eldap_search{scope = Scope});
 parse_search_args([{attributes, Attrs} | T], A) ->
-    parse_search_args(T,
-		      A#eldap_search{attributes = Attrs});
+    parse_search_args(
+        T,
+        A#eldap_search{attributes = Attrs}
+    );
 parse_search_args([{types_only, TypesOnly} | T], A) ->
-    parse_search_args(T,
-		      A#eldap_search{types_only = TypesOnly});
-parse_search_args([{timeout, Timeout} | T], A)
-    when is_integer(Timeout) ->
+    parse_search_args(
+        T,
+        A#eldap_search{types_only = TypesOnly}
+    );
+parse_search_args([{timeout, Timeout} | T], A) when
+    is_integer(Timeout)
+->
     parse_search_args(T, A#eldap_search{timeout = Timeout});
-parse_search_args([{limit, Limit} | T], A)
-    when is_integer(Limit) ->
+parse_search_args([{limit, Limit} | T], A) when
+    is_integer(Limit)
+->
     parse_search_args(T, A#eldap_search{limit = Limit});
 parse_search_args([{deref_aliases, never} | T], A) ->
-    parse_search_args(T,
-		      A#eldap_search{deref_aliases = neverDerefAliases});
-parse_search_args([{deref_aliases, searching} | T],
-		  A) ->
-    parse_search_args(T,
-		      A#eldap_search{deref_aliases = derefInSearching});
+    parse_search_args(
+        T,
+        A#eldap_search{deref_aliases = neverDerefAliases}
+    );
+parse_search_args(
+    [{deref_aliases, searching} | T],
+    A
+) ->
+    parse_search_args(
+        T,
+        A#eldap_search{deref_aliases = derefInSearching}
+    );
 parse_search_args([{deref_aliases, finding} | T], A) ->
-    parse_search_args(T,
-		      A#eldap_search{deref_aliases = derefFindingBaseObj});
+    parse_search_args(
+        T,
+        A#eldap_search{deref_aliases = derefFindingBaseObj}
+    );
 parse_search_args([{deref_aliases, always} | T], A) ->
-    parse_search_args(T,
-		      A#eldap_search{deref_aliases = derefAlways});
+    parse_search_args(
+        T,
+        A#eldap_search{deref_aliases = derefAlways}
+    );
 parse_search_args([H | _], _) ->
     throw({error, {unknown_arg, H}});
-parse_search_args([], A) -> A.
+parse_search_args([], A) ->
+    A.
 
 baseObject() -> baseObject.
 
@@ -412,9 +502,17 @@ wholeSubtree() -> wholeSubtree.
 %%%
 %%% Boolean filter operations
 %%%
--type filter() :: 'and'() | 'or'() | 'not'() | equalityMatch() |
-                  greaterOrEqual() | lessOrEqual() | approxMatch() |
-                  present() | substrings() | extensibleMatch().
+-type filter() ::
+    'and'()
+    | 'or'()
+    | 'not'()
+    | equalityMatch()
+    | greaterOrEqual()
+    | lessOrEqual()
+    | approxMatch()
+    | present()
+    | substrings()
+    | extensibleMatch().
 
 %%%
 %%% The following Filter parameters consist of an attribute
@@ -462,14 +560,18 @@ approxMatch(Desc, Value) ->
     {approxMatch, av_assert(Desc, Value)}.
 
 -type 'AttributeValueAssertion'() ::
-        #'AttributeValueAssertion'{attributeDesc :: binary(),
-                                   assertionValue :: binary()}.
+    #'AttributeValueAssertion'{
+        attributeDesc :: binary(),
+        assertionValue :: binary()
+    }.
 
 -spec av_assert(binary(), binary()) -> 'AttributeValueAssertion'().
 
 av_assert(Desc, Value) ->
-    #'AttributeValueAssertion'{attributeDesc = Desc,
-			       assertionValue = Value}.
+    #'AttributeValueAssertion'{
+        attributeDesc = Desc,
+        assertionValue = Value
+    }.
 
 %%%
 %%% Filter to check for the presence of an attribute
@@ -506,24 +608,29 @@ present(Attribute) ->
 %%%
 -type substr() :: [{initial | any | final, binary()}].
 -type 'SubstringFilter'() ::
-        #'SubstringFilter'{type :: binary(),
-                           substrings :: substr()}.
+    #'SubstringFilter'{
+        type :: binary(),
+        substrings :: substr()
+    }.
 
 -type substrings() :: {substrings, 'SubstringFilter'()}.
 -spec substrings(binary(), substr()) -> substrings().
 
 substrings(Type, SubStr) ->
-    {substrings,
-     #'SubstringFilter'{type = Type, substrings = SubStr}}.
+    {substrings, #'SubstringFilter'{type = Type, substrings = SubStr}}.
 
--type match_opts() :: [{matchingRule | type, binary()} |
-                       {dnAttributes, boolean()}].
+-type match_opts() :: [
+    {matchingRule | type, binary()}
+    | {dnAttributes, boolean()}
+].
 
 -type 'MatchingRuleAssertion'() ::
-        #'MatchingRuleAssertion'{matchValue :: binary(),
-                                 type :: asn1_NOVALUE | binary(),
-                                 matchingRule :: asn1_NOVALUE | binary(),
-                                 dnAttributes :: asn1_DEFAULT | true}.
+    #'MatchingRuleAssertion'{
+        matchValue :: binary(),
+        type :: asn1_NOVALUE | binary(),
+        matchingRule :: asn1_NOVALUE | binary(),
+        dnAttributes :: asn1_DEFAULT | true
+    }.
 
 -type extensibleMatch() :: {extensibleMatch, 'MatchingRuleAssertion'()}.
 -spec extensibleMatch(binary(), match_opts()) -> extensibleMatch().
@@ -533,24 +640,32 @@ extensibleMatch(Value, Opts) ->
     {extensibleMatch, extensibleMatch_opts(Opts, MRA)}.
 
 extensibleMatch_opts([{matchingRule, Rule} | Opts], MRA) ->
-    extensibleMatch_opts(Opts,
-			 MRA#'MatchingRuleAssertion'{matchingRule = Rule});
+    extensibleMatch_opts(
+        Opts,
+        MRA#'MatchingRuleAssertion'{matchingRule = Rule}
+    );
 extensibleMatch_opts([{type, Desc} | Opts], MRA) ->
-    extensibleMatch_opts(Opts,
-			 MRA#'MatchingRuleAssertion'{type = Desc});
-extensibleMatch_opts([{dnAttributes, true} | Opts],
-		     MRA) ->
-    extensibleMatch_opts(Opts,
-			 MRA#'MatchingRuleAssertion'{dnAttributes = true});
+    extensibleMatch_opts(
+        Opts,
+        MRA#'MatchingRuleAssertion'{type = Desc}
+    );
+extensibleMatch_opts(
+    [{dnAttributes, true} | Opts],
+    MRA
+) ->
+    extensibleMatch_opts(
+        Opts,
+        MRA#'MatchingRuleAssertion'{dnAttributes = true}
+    );
 extensibleMatch_opts([_ | Opts], MRA) ->
     extensibleMatch_opts(Opts, MRA);
-extensibleMatch_opts([], MRA) -> MRA.
+extensibleMatch_opts([], MRA) ->
+    MRA.
 
 get_handle(Pid) when is_pid(Pid) -> Pid;
 get_handle(Atom) when is_atom(Atom) -> Atom;
 get_handle(Name) when is_binary(Name) ->
-    misc:binary_to_atom(<<"eldap_",
-			    Name/binary>>).
+    misc:binary_to_atom(<<"eldap_", Name/binary>>).
 
 %%%----------------------------------------------------------------------
 %%% Callback functions from gen_fsm
@@ -566,55 +681,76 @@ get_handle(Name) when is_binary(Name) ->
 %% process.
 %%----------------------------------------------------------------------
 init([Hosts, Port, Rootdn, Passwd, Opts]) ->
-    Encrypt = case proplists:get_value(encrypt, Opts) of
-                  tls -> tls;
-                  _ -> none
-	      end,
-    PortTemp = case Port of
-		 undefined ->
-		     case Encrypt of
-		       tls -> ?LDAPS_PORT;
-		       _ -> ?LDAP_PORT
-		     end;
-		 PT -> PT
-	       end,
-    CertOpts = case proplists:get_value(tls_certfile, Opts) of
-		   undefined ->
-		       [];
-		   Path1 ->
-		       [{certfile, Path1}]
-	       end,
-    CacertOpts = case proplists:get_value(tls_cacertfile, Opts) of
-                     undefined ->
-                         [];
-                     Path2 ->
-                         [{cacertfile, Path2}]
-                 end,
-    DepthOpts = case proplists:get_value(tls_depth, Opts) of
-                    undefined ->
-                        [];
-                    Depth ->
-                        [{depth, Depth}]
-                end,
+    Encrypt =
+        case proplists:get_value(encrypt, Opts) of
+            tls -> tls;
+            _ -> none
+        end,
+    PortTemp =
+        case Port of
+            undefined ->
+                case Encrypt of
+                    tls -> ?LDAPS_PORT;
+                    _ -> ?LDAP_PORT
+                end;
+            PT ->
+                PT
+        end,
+    CertOpts =
+        case proplists:get_value(tls_certfile, Opts) of
+            undefined ->
+                [];
+            Path1 ->
+                [{certfile, Path1}]
+        end,
+    CacertOpts =
+        case proplists:get_value(tls_cacertfile, Opts) of
+            undefined ->
+                [];
+            Path2 ->
+                [{cacertfile, Path2}]
+        end,
+    DepthOpts =
+        case proplists:get_value(tls_depth, Opts) of
+            undefined ->
+                [];
+            Depth ->
+                [{depth, Depth}]
+        end,
     Verify = proplists:get_value(tls_verify, Opts, false),
-    TLSOpts = if (Verify == hard orelse Verify == soft)
-		   andalso CacertOpts == [] ->
-		     ?WARNING_MSG("TLS verification is enabled but no CA "
-				  "certfiles configured, so verification "
-				  "is disabled.",
-				  []),
-		     CertOpts;
-		 Verify == soft ->
-		     [{verify, verify_peer}] ++ CertOpts ++ CacertOpts ++ DepthOpts;
-		 Verify == hard ->
-		     [{verify, verify_peer}] ++ CertOpts ++ CacertOpts ++ DepthOpts;
-		 true -> [{verify, verify_none}]
-	      end,
+    TLSOpts =
+        if
+            (Verify == hard orelse Verify == soft) andalso
+                CacertOpts == [] ->
+                ?WARNING_MSG(
+                    "TLS verification is enabled but no CA "
+                    "certfiles configured, so verification "
+                    "is disabled.",
+                    []
+                ),
+                CertOpts;
+            Verify == soft ->
+                [{verify, verify_peer}] ++ CertOpts ++ CacertOpts ++ DepthOpts;
+            Verify == hard ->
+                [{verify, verify_peer}] ++ CertOpts ++ CacertOpts ++ DepthOpts;
+            true ->
+                [{verify, verify_none}]
+        end,
     {ok, connecting,
-     #eldap{hosts = Hosts, port = PortTemp, rootdn = Rootdn,
-	    passwd = Passwd, tls = Encrypt, tls_options = TLSOpts,
-	    id = 0, dict = dict:new(), req_q = queue:new()},
-     0}.
+        #eldap{
+            hosts = Hosts,
+            port = PortTemp,
+            rootdn = Rootdn,
+            passwd = Passwd,
+            tls = Encrypt,
+            tls_options = TLSOpts,
+            id = 0,
+            dict = dict:new(),
+            req_q = queue:new(),
+            bind = sasl,
+            krb = undefined
+        },
+        0}.
 
 connecting(timeout, S) ->
     {ok, NextState, NewS} = connect_bind(S),
@@ -654,64 +790,119 @@ handle_sync_event(_Event, _From, StateName, S) ->
 %%
 %% Packets arriving in various states
 %%
-handle_info({Tag, _Socket, Data}, connecting, S)
-    when Tag == tcp; Tag == ssl ->
+handle_info({Tag, _Socket, Data}, connecting, S) when
+    Tag == tcp; Tag == ssl
+->
     ?DEBUG("TCP packet received when disconnected!~n~p", [Data]),
     {next_state, connecting, S};
-handle_info({Tag, _Socket, Data}, wait_bind_response, S)
-    when Tag == tcp; Tag == ssl ->
+handle_info({Tag, Socket, Data}, wait_bind_response, S) when
+    Tag == tcp; Tag == ssl
+->
     misc:cancel_timer(S#eldap.bind_timer),
     case catch recvd_wait_bind_response(Data, S) of
-      bound -> dequeue_commands(S);
-      {fail_bind, Reason} ->
-	  report_bind_failure(S#eldap.host, S#eldap.port, Reason),
-	  {next_state, connecting,
-	   close_and_retry(S, ?GRACEFUL_RETRY_TIMEOUT)};
-      {'EXIT', Reason} ->
-	  report_bind_failure(S#eldap.host, S#eldap.port, Reason),
-	  {next_state, connecting, close_and_retry(S)};
-      {error, Reason} ->
-	  report_bind_failure(S#eldap.host, S#eldap.port, Reason),
-	  {next_state, connecting, close_and_retry(S)}
+        bound ->
+            dequeue_commands(S);
+        {sasl_binding, Token} ->
+            case p1_fsm:sync_send_event(S#eldap.krb, Token) of
+                {ok, NewToken} ->
+                    Id = bump_id(S),
+
+                    Req = #'BindRequest'{
+                        version = S#eldap.version,
+                        name = <<>>,
+                        authentication =
+                            {sasl, #'SaslCredentials'{
+                                mechanism = <<"GSSAPI">>,
+                                credentials = NewToken
+                            }}
+                    },
+                    Message = #'LDAPMessage'{
+                        messageID = Id,
+                        protocolOp = {bindRequest, Req}
+                    },
+                    ?DEBUG("Bind Request Message:~p~n", [
+                        ejabberd_config:may_hide_data(Message)
+                    ]),
+                    {ok, Bytes} = 'ELDAPv3':encode('LDAPMessage', Message),
+                    case (S#eldap.sockmod):send(Socket, Bytes) of
+                        ok ->
+                            {next_state, wait_bind_response, S#eldap{
+                                id = Id
+                            }};
+                        Error ->
+                            report_bind_failure(S#eldap.host, S#eldap.port, Error),
+                            {next_state, connecting, close_and_retry(S)}
+                    end;
+                {'EXIT', Reason} ->
+                    report_bind_failure(S#eldap.host, S#eldap.port, Reason),
+                    {next_state, connecting, close_and_retry(S)}
+            end;
+        {fail_bind, Reason} ->
+            report_bind_failure(S#eldap.host, S#eldap.port, Reason),
+            {next_state, connecting, close_and_retry(S, ?GRACEFUL_RETRY_TIMEOUT)};
+        {'EXIT', Reason} ->
+            report_bind_failure(S#eldap.host, S#eldap.port, Reason),
+            {next_state, connecting, close_and_retry(S)};
+        {error, Reason} ->
+            report_bind_failure(S#eldap.host, S#eldap.port, Reason),
+            {next_state, connecting, close_and_retry(S)}
     end;
-handle_info({Tag, _Socket, Data}, StateName, S)
-    when (StateName == active orelse StateName == active_bind)
-	   andalso (Tag == tcp orelse Tag == ssl) ->
+handle_info({Tag, _Socket, Data}, StateName, S) when
+    (StateName == active orelse StateName == active_bind) andalso
+        (Tag == tcp orelse Tag == ssl)
+->
     case catch recvd_packet(Data, S) of
-      {response, Response, RequestType} ->
-	  NewS = case Response of
-		   {reply, Reply, To, S1} -> p1_fsm:reply(To, Reply), S1;
-		   {ok, S1} -> S1
-		 end,
-	  if StateName == active_bind andalso
-	       RequestType == bindRequest
-	       orelse StateName == active ->
-		 dequeue_commands(NewS);
-	     true -> {next_state, StateName, NewS}
-	  end;
-      _ -> {next_state, StateName, S}
+        {response, Response, RequestType} ->
+            NewS =
+                case Response of
+                    {reply, Reply, To, S1} ->
+                        p1_fsm:reply(To, Reply),
+                        S1;
+                    {ok, S1} ->
+                        S1
+                end,
+            if
+                StateName == active_bind andalso
+                    RequestType == bindRequest orelse
+                    StateName == active ->
+                    dequeue_commands(NewS);
+                true ->
+                    {next_state, StateName, NewS}
+            end;
+        _ ->
+            {next_state, StateName, S}
     end;
-handle_info({Tag, _Socket}, Fsm_state, S)
-    when Tag == tcp_closed; Tag == ssl_closed ->
-    ?WARNING_MSG("LDAP server closed the connection: ~ts:~p~nIn "
-		 "State: ~p",
-		 [S#eldap.host, S#eldap.port, Fsm_state]),
+handle_info({Tag, _Socket}, Fsm_state, S) when
+    Tag == tcp_closed; Tag == ssl_closed
+->
+    ?WARNING_MSG(
+        "LDAP server closed the connection: ~ts:~p~nIn "
+        "State: ~p",
+        [S#eldap.host, S#eldap.port, Fsm_state]
+    ),
     {next_state, connecting, close_and_retry(S)};
-handle_info({Tag, _Socket, Reason}, Fsm_state, S)
-    when Tag == tcp_error; Tag == ssl_error ->
-    ?DEBUG("eldap received tcp_error: ~p~nIn State: ~p",
-	   [Reason, Fsm_state]),
+handle_info({Tag, _Socket, Reason}, Fsm_state, S) when
+    Tag == tcp_error; Tag == ssl_error
+->
+    ?DEBUG(
+        "eldap received tcp_error: ~p~nIn State: ~p",
+        [Reason, Fsm_state]
+    ),
     {next_state, connecting, close_and_retry(S)};
 %%
 %% Timers
 %%
-handle_info({timeout, Timer, {cmd_timeout, Id}},
-	    StateName, S) ->
+handle_info(
+    {timeout, Timer, {cmd_timeout, Id}},
+    StateName,
+    S
+) ->
     case cmd_timeout(Timer, Id, S) of
-      {reply, To, Reason, NewS} ->
-	  p1_fsm:reply(To, Reason),
-	  {next_state, StateName, NewS};
-      {error, _Reason} -> {next_state, StateName, S}
+        {reply, To, Reason, NewS} ->
+            p1_fsm:reply(To, Reason),
+            {next_state, StateName, NewS};
+        {error, _Reason} ->
+            {next_state, StateName, S}
     end;
 handle_info({timeout, retry_connect}, connecting, S) ->
     {ok, NextState, NewS} = connect_bind(S),
@@ -722,9 +913,11 @@ handle_info({timeout, _Timer, bind_timeout}, wait_bind_response, S) ->
 %% Make sure we don't fill the message queue with rubbish
 %%
 handle_info(Info, StateName, S) ->
-    ?DEBUG("Unexpected Info: ~p~nIn state: "
-	   "~p~n when StateData is: ~p",
-	   [Info, StateName, S]),
+    ?DEBUG(
+        "Unexpected Info: ~p~nIn state: "
+        "~p~n when StateData is: ~p",
+        [Info, StateName, S]
+    ),
     {next_state, StateName, S}.
 
 %%----------------------------------------------------------------------
@@ -747,77 +940,89 @@ code_change(_OldVsn, StateName, S, _Extra) ->
 %%%----------------------------------------------------------------------
 dequeue_commands(S) ->
     case queue:out(S#eldap.req_q) of
-      {{value, {Event, From}}, Q} ->
-	  case process_command(S#eldap{req_q = Q}, Event, From) of
-	    {_, active, NewS} -> dequeue_commands(NewS);
-	    Res -> Res
-	  end;
-      {empty, _} -> {next_state, active, S}
+        {{value, {Event, From}}, Q} ->
+            case process_command(S#eldap{req_q = Q}, Event, From) of
+                {_, active, NewS} -> dequeue_commands(NewS);
+                Res -> Res
+            end;
+        {empty, _} ->
+            {next_state, active, S}
     end.
 
 process_command(S, Event, From) ->
     case send_command(Event, From, S) of
-      {ok, NewS} ->
-	  case Event of
-	    {bind, _, _} -> {next_state, active_bind, NewS};
-	    _ -> {next_state, active, NewS}
-	  end;
-      {error, _Reason} ->
-	  Q = queue:in_r({Event, From}, S#eldap.req_q),
-	  NewS = close_and_retry(S#eldap{req_q = Q}),
-	  {next_state, connecting, NewS}
+        {ok, NewS} ->
+            case Event of
+                {bind, _, _} -> {next_state, active_bind, NewS};
+                _ -> {next_state, active, NewS}
+            end;
+        {error, _Reason} ->
+            Q = queue:in_r({Event, From}, S#eldap.req_q),
+            NewS = close_and_retry(S#eldap{req_q = Q}),
+            {next_state, connecting, NewS}
     end.
 
 send_command(Command, From, S) ->
     Id = bump_id(S),
     {Name, Request} = gen_req(Command),
-    Message = #'LDAPMessage'{messageID = Id,
-			     protocolOp = {Name, Request}},
+    Message = #'LDAPMessage'{
+        messageID = Id,
+        protocolOp = {Name, Request}
+    },
     ?DEBUG("~p~n", [{Name, ejabberd_config:may_hide_data(Request)}]),
     {ok, Bytes} = 'ELDAPv3':encode('LDAPMessage', Message),
     case (S#eldap.sockmod):send(S#eldap.fd, Bytes) of
-      ok ->
-	Timer = erlang:start_timer(?CMD_TIMEOUT, self(), {cmd_timeout, Id}),
-	New_dict = dict:store(Id, [{Timer, Command, From, Name}], S#eldap.dict),
-	{ok, S#eldap{id = Id, dict = New_dict}};
-      Error ->
-	Error
+        ok ->
+            Timer = erlang:start_timer(?CMD_TIMEOUT, self(), {cmd_timeout, Id}),
+            New_dict = dict:store(Id, [{Timer, Command, From, Name}], S#eldap.dict),
+            {ok, S#eldap{id = Id, dict = New_dict}};
+        Error ->
+            Error
     end.
 
 gen_req({search, A}) ->
-    {searchRequest,
-     #'SearchRequest'{baseObject = A#eldap_search.base,
-		      scope = A#eldap_search.scope,
-		      derefAliases = A#eldap_search.deref_aliases,
-		      sizeLimit = A#eldap_search.limit,
-		      timeLimit = A#eldap_search.timeout,
-		      typesOnly = A#eldap_search.types_only,
-		      filter = A#eldap_search.filter,
-		      attributes = A#eldap_search.attributes}};
+    {searchRequest, #'SearchRequest'{
+        baseObject = A#eldap_search.base,
+        scope = A#eldap_search.scope,
+        derefAliases = A#eldap_search.deref_aliases,
+        sizeLimit = A#eldap_search.limit,
+        timeLimit = A#eldap_search.timeout,
+        typesOnly = A#eldap_search.types_only,
+        filter = A#eldap_search.filter,
+        attributes = A#eldap_search.attributes
+    }};
 gen_req({add, Entry, Attrs}) ->
-    {addRequest,
-     #'AddRequest'{entry = Entry, attributes = Attrs}};
-gen_req({delete, Entry}) -> {delRequest, Entry};
+    {addRequest, #'AddRequest'{entry = Entry, attributes = Attrs}};
+gen_req({delete, Entry}) ->
+    {delRequest, Entry};
 gen_req({modify, Obj, Mod}) ->
-    {modifyRequest,
-     #'ModifyRequest'{object = Obj, modification = Mod}};
-gen_req({modify_dn, Entry, NewRDN, DelOldRDN,
-	 NewSup}) ->
-    {modDNRequest,
-     #'ModifyDNRequest'{entry = Entry, newrdn = NewRDN,
-			deleteoldrdn = DelOldRDN, newSuperior = NewSup}};
+    {modifyRequest, #'ModifyRequest'{object = Obj, modification = Mod}};
+gen_req({modify_dn, Entry, NewRDN, DelOldRDN, NewSup}) ->
+    {modDNRequest, #'ModifyDNRequest'{
+        entry = Entry,
+        newrdn = NewRDN,
+        deleteoldrdn = DelOldRDN,
+        newSuperior = NewSup
+    }};
 gen_req({modify_passwd, DN, Passwd}) ->
-    {ok, ReqVal} = 'ELDAPv3':encode('PasswdModifyRequestValue',
-				    #'PasswdModifyRequestValue'{userIdentity = DN,
-								newPasswd =
-								    Passwd}),
-    {extendedReq,
-     #'ExtendedRequest'{requestName = ?passwdModifyOID,
-			requestValue = iolist_to_binary(ReqVal)}};
+    {ok, ReqVal} = 'ELDAPv3':encode(
+        'PasswdModifyRequestValue',
+        #'PasswdModifyRequestValue'{
+            userIdentity = DN,
+            newPasswd =
+                Passwd
+        }
+    ),
+    {extendedReq, #'ExtendedRequest'{
+        requestName = ?passwdModifyOID,
+        requestValue = iolist_to_binary(ReqVal)
+    }};
 gen_req({bind, RootDN, Passwd}) ->
-    {bindRequest,
-     #'BindRequest'{version = ?LDAP_VERSION, name = RootDN,
-		    authentication = {simple, Passwd}}}.
+    {bindRequest, #'BindRequest'{
+        version = ?LDAP_VERSION,
+        name = RootDN,
+        authentication = {simple, Passwd}
+    }}.
 
 %%-----------------------------------------------------------------------
 %% recvd_packet
@@ -831,111 +1036,138 @@ gen_req({bind, RootDN, Passwd}) ->
 %%-----------------------------------------------------------------------
 recvd_packet(Pkt, S) ->
     case 'ELDAPv3':decode('LDAPMessage', Pkt) of
-      {ok, Msg} ->
-	  Op = Msg#'LDAPMessage'.protocolOp,
-	  ?DEBUG("~p", [Op]),
-	  Dict = S#eldap.dict,
-	  Id = Msg#'LDAPMessage'.messageID,
-	  {Timer, From, Name, Result_so_far} = get_op_rec(Id,
-							  Dict),
-	  Answer = case {Name, Op} of
-		     {searchRequest, {searchResEntry, R}}
-			 when is_record(R, 'SearchResultEntry') ->
-			 New_dict = dict:append(Id, R, Dict),
-			 {ok, S#eldap{dict = New_dict}};
-		     {searchRequest, {searchResDone, Result}} ->
-			 Reason = Result#'LDAPResult'.resultCode,
-			 if Reason == success; Reason == sizeLimitExceeded ->
-				{Res, Ref} = polish(Result_so_far),
-				New_dict = dict:erase(Id, Dict),
-				misc:cancel_timer(Timer),
-				{reply,
-				 #eldap_search_result{entries = Res,
-						      referrals = Ref},
-				 From, S#eldap{dict = New_dict}};
-			    true ->
-				New_dict = dict:erase(Id, Dict),
-				misc:cancel_timer(Timer),
-				{reply, {error, Reason}, From,
-				 S#eldap{dict = New_dict}}
-			 end;
-		     {searchRequest, {searchResRef, R}} ->
-			 New_dict = dict:append(Id, R, Dict),
-			 {ok, S#eldap{dict = New_dict}};
-		     {addRequest, {addResponse, Result}} ->
-			 New_dict = dict:erase(Id, Dict),
-			 misc:cancel_timer(Timer),
-			 Reply = check_reply(Result, From),
-			 {reply, Reply, From, S#eldap{dict = New_dict}};
-		     {delRequest, {delResponse, Result}} ->
-			 New_dict = dict:erase(Id, Dict),
-			 misc:cancel_timer(Timer),
-			 Reply = check_reply(Result, From),
-			 {reply, Reply, From, S#eldap{dict = New_dict}};
-		     {modifyRequest, {modifyResponse, Result}} ->
-			 New_dict = dict:erase(Id, Dict),
-			 misc:cancel_timer(Timer),
-			 Reply = check_reply(Result, From),
-			 {reply, Reply, From, S#eldap{dict = New_dict}};
-		     {modDNRequest, {modDNResponse, Result}} ->
-			 New_dict = dict:erase(Id, Dict),
-			 misc:cancel_timer(Timer),
-			 Reply = check_reply(Result, From),
-			 {reply, Reply, From, S#eldap{dict = New_dict}};
-		     {bindRequest, {bindResponse, Result}} ->
-			 New_dict = dict:erase(Id, Dict),
-			 misc:cancel_timer(Timer),
-			 Reply = check_bind_reply(Result, From),
-			 {reply, Reply, From, S#eldap{dict = New_dict}};
-		     {extendedReq, {extendedResp, Result}} ->
-			 New_dict = dict:erase(Id, Dict),
-			 misc:cancel_timer(Timer),
-			 Reply = check_extended_reply(Result, From),
-			 {reply, Reply, From, S#eldap{dict = New_dict}};
-		     {OtherName, OtherResult} ->
-			 New_dict = dict:erase(Id, Dict),
-			 misc:cancel_timer(Timer),
-			 {reply,
-			  {error, {invalid_result, OtherName, OtherResult}},
-			  From, S#eldap{dict = New_dict}}
-		   end,
-	  {response, Answer, Name};
-      Error -> Error
+        {ok, Msg} ->
+            Op = Msg#'LDAPMessage'.protocolOp,
+            ?DEBUG("~p", [Op]),
+            Dict = S#eldap.dict,
+            Id = Msg#'LDAPMessage'.messageID,
+            {Timer, From, Name, Result_so_far} = get_op_rec(
+                Id,
+                Dict
+            ),
+            Answer =
+                case {Name, Op} of
+                    {searchRequest, {searchResEntry, R}} when
+                        is_record(R, 'SearchResultEntry')
+                    ->
+                        New_dict = dict:append(Id, R, Dict),
+                        {ok, S#eldap{dict = New_dict}};
+                    {searchRequest, {searchResDone, Result}} ->
+                        Reason = Result#'LDAPResult'.resultCode,
+                        if
+                            Reason == success; Reason == sizeLimitExceeded ->
+                                {Res, Ref} = polish(Result_so_far),
+                                New_dict = dict:erase(Id, Dict),
+                                misc:cancel_timer(Timer),
+                                {reply,
+                                    #eldap_search_result{
+                                        entries = Res,
+                                        referrals = Ref
+                                    },
+                                    From, S#eldap{dict = New_dict}};
+                            true ->
+                                New_dict = dict:erase(Id, Dict),
+                                misc:cancel_timer(Timer),
+                                {reply, {error, Reason}, From, S#eldap{dict = New_dict}}
+                        end;
+                    {searchRequest, {searchResRef, R}} ->
+                        New_dict = dict:append(Id, R, Dict),
+                        {ok, S#eldap{dict = New_dict}};
+                    {addRequest, {addResponse, Result}} ->
+                        New_dict = dict:erase(Id, Dict),
+                        misc:cancel_timer(Timer),
+                        Reply = check_reply(Result, From),
+                        {reply, Reply, From, S#eldap{dict = New_dict}};
+                    {delRequest, {delResponse, Result}} ->
+                        New_dict = dict:erase(Id, Dict),
+                        misc:cancel_timer(Timer),
+                        Reply = check_reply(Result, From),
+                        {reply, Reply, From, S#eldap{dict = New_dict}};
+                    {modifyRequest, {modifyResponse, Result}} ->
+                        New_dict = dict:erase(Id, Dict),
+                        misc:cancel_timer(Timer),
+                        Reply = check_reply(Result, From),
+                        {reply, Reply, From, S#eldap{dict = New_dict}};
+                    {modDNRequest, {modDNResponse, Result}} ->
+                        New_dict = dict:erase(Id, Dict),
+                        misc:cancel_timer(Timer),
+                        Reply = check_reply(Result, From),
+                        {reply, Reply, From, S#eldap{dict = New_dict}};
+                    {bindRequest, {bindResponse, Result}} ->
+                        New_dict = dict:erase(Id, Dict),
+                        misc:cancel_timer(Timer),
+                        Reply = check_bind_reply(Result, From),
+                        {reply, Reply, From, S#eldap{dict = New_dict}};
+                    {extendedReq, {extendedResp, Result}} ->
+                        New_dict = dict:erase(Id, Dict),
+                        misc:cancel_timer(Timer),
+                        Reply = check_extended_reply(Result, From),
+                        {reply, Reply, From, S#eldap{dict = New_dict}};
+                    {OtherName, OtherResult} ->
+                        New_dict = dict:erase(Id, Dict),
+                        misc:cancel_timer(Timer),
+                        {reply, {error, {invalid_result, OtherName, OtherResult}}, From, S#eldap{
+                            dict = New_dict
+                        }}
+                end,
+            {response, Answer, Name};
+        Error ->
+            Error
     end.
 
-check_reply(#'LDAPResult'{resultCode = success},
-	    _From) ->
+check_reply(
+    #'LDAPResult'{resultCode = success},
+    _From
+) ->
     ok;
-check_reply(#'LDAPResult'{resultCode = Reason},
-	    _From) ->
+check_reply(
+    #'LDAPResult'{resultCode = Reason},
+    _From
+) ->
     {error, Reason};
-check_reply(Other, _From) -> {error, Other}.
+check_reply(Other, _From) ->
+    {error, Other}.
 
-check_bind_reply(#'BindResponse'{resultCode = success},
-		 _From) ->
+check_bind_reply(
+    #'BindResponse'{resultCode = success},
+    _From
+) ->
     ok;
-check_bind_reply(#'BindResponse'{resultCode = Reason},
-		 _From) ->
+check_bind_reply(
+    #'BindResponse'{resultCode = Reason},
+    _From
+) ->
     {error, Reason};
-check_bind_reply(Other, _From) -> {error, Other}.
+check_bind_reply(Other, _From) ->
+    {error, Other}.
 
 %% TODO: process reply depending on requestName:
 %% this requires BER-decoding of #'ExtendedResponse'.response
-check_extended_reply(#'ExtendedResponse'{resultCode =
-					     success},
-		     _From) ->
+check_extended_reply(
+    #'ExtendedResponse'{
+        resultCode =
+            success
+    },
+    _From
+) ->
     ok;
-check_extended_reply(#'ExtendedResponse'{resultCode =
-					     Reason},
-		     _From) ->
+check_extended_reply(
+    #'ExtendedResponse'{
+        resultCode =
+            Reason
+    },
+    _From
+) ->
     {error, Reason};
-check_extended_reply(Other, _From) -> {error, Other}.
+check_extended_reply(Other, _From) ->
+    {error, Other}.
 
 get_op_rec(Id, Dict) ->
     case dict:find(Id, Dict) of
-      {ok, [{Timer, _Command, From, Name} | Res]} ->
-	  {Timer, From, Name, Res};
-      error -> throw({error, unkown_id})
+        {ok, [{Timer, _Command, From, Name} | Res]} ->
+            {Timer, From, Name, Res};
+        error ->
+            throw({error, unkown_id})
     end.
 
 %%-----------------------------------------------------------------------
@@ -949,17 +1181,19 @@ get_op_rec(Id, Dict) ->
 %%-----------------------------------------------------------------------
 recvd_wait_bind_response(Pkt, S) ->
     case 'ELDAPv3':decode('LDAPMessage', Pkt) of
-      {ok, Msg} ->
-	  ?DEBUG("~p", [Msg]),
-	  check_id(S#eldap.id, Msg#'LDAPMessage'.messageID),
-	  case Msg#'LDAPMessage'.protocolOp of
-	    {bindResponse, Result} ->
-		case Result#'BindResponse'.resultCode of
-		  success -> bound;
-		  Error -> {fail_bind, Error}
-		end
-	  end;
-      Else -> {fail_bind, Else}
+        {ok, Msg} ->
+            ?DEBUG("~p", [Msg]),
+            check_id(S#eldap.id, Msg#'LDAPMessage'.messageID),
+            case Msg#'LDAPMessage'.protocolOp of
+                {bindResponse, Result} ->
+                    case Result#'BindResponse'.resultCode of
+                        success -> bound;
+                        saslBindInProgress -> {sasl_binding, Result#'BindResponse'.serverSaslCreds};
+                        Error -> {fail_bind, Error}
+                    end
+            end;
+        Else ->
+            {fail_bind, Else}
     end.
 
 check_id(Id, Id) -> ok;
@@ -971,23 +1205,36 @@ check_id(_, _) -> throw({error, wrong_bind_id}).
 
 close_and_retry(S, Timeout) ->
     catch (S#eldap.sockmod):close(S#eldap.fd),
-    Queue = dict:fold(fun (_Id,
-			   [{Timer, Command, From, _Name} | _], Q) ->
-			      misc:cancel_timer(Timer),
-			      queue:in_r({Command, From}, Q);
-			  (_, _, Q) -> Q
-		      end,
-		      S#eldap.req_q, S#eldap.dict),
-    erlang:send_after(Timeout, self(),
-		      {timeout, retry_connect}),
+    Queue = dict:fold(
+        fun
+            (
+                _Id,
+                [{Timer, Command, From, _Name} | _],
+                Q
+            ) ->
+                misc:cancel_timer(Timer),
+                queue:in_r({Command, From}, Q);
+            (_, _, Q) ->
+                Q
+        end,
+        S#eldap.req_q,
+        S#eldap.dict
+    ),
+    erlang:send_after(
+        Timeout,
+        self(),
+        {timeout, retry_connect}
+    ),
     S#eldap{fd = undefined, req_q = Queue, dict = dict:new()}.
 
 close_and_retry(S) ->
     close_and_retry(S, ?RETRY_TIMEOUT).
 
 report_bind_failure(Host, Port, Reason) ->
-    ?WARNING_MSG("LDAP bind failed on ~ts:~p~nReason: ~p",
-		 [Host, Port, Reason]).
+    ?WARNING_MSG(
+        "LDAP bind failed on ~ts:~p~nReason: ~p",
+        [Host, Port, Reason]
+    ).
 
 %%-----------------------------------------------------------------------
 %% Sort out timed out commands
@@ -995,21 +1242,19 @@ report_bind_failure(Host, Port, Reason) ->
 cmd_timeout(Timer, Id, S) ->
     Dict = S#eldap.dict,
     case dict:find(Id, Dict) of
-      {ok, [{Timer, _Command, From, Name} | Res]} ->
-	  case Name of
-	    searchRequest ->
-		{Res1, Ref1} = polish(Res),
-		New_dict = dict:erase(Id, Dict),
-		{reply, From,
-		 {timeout,
-		  #eldap_search_result{entries = Res1, referrals = Ref1}},
-		 S#eldap{dict = New_dict}};
-	    _ ->
-		New_dict = dict:erase(Id, Dict),
-		{reply, From, {error, timeout},
-		 S#eldap{dict = New_dict}}
-	  end;
-      error -> {error, timed_out_cmd_not_in_dict}
+        {ok, [{Timer, _Command, From, Name} | Res]} ->
+            case Name of
+                searchRequest ->
+                    {Res1, Ref1} = polish(Res),
+                    New_dict = dict:erase(Id, Dict),
+                    {reply, From, {timeout, #eldap_search_result{entries = Res1, referrals = Ref1}},
+                        S#eldap{dict = New_dict}};
+                _ ->
+                    New_dict = dict:erase(Id, Dict),
+                    {reply, From, {error, timeout}, S#eldap{dict = New_dict}}
+            end;
+        error ->
+            {error, timed_out_cmd_not_in_dict}
     end.
 
 %%-----------------------------------------------------------------------
@@ -1021,20 +1266,32 @@ cmd_timeout(Timer, Id, S) ->
 
 polish(Entries) -> polish(Entries, [], []).
 
-polish([H | T], Res, Ref)
-    when is_record(H, 'SearchResultEntry') ->
+polish([H | T], Res, Ref) when
+    is_record(H, 'SearchResultEntry')
+->
     ObjectName = H#'SearchResultEntry'.objectName,
-    F = fun ({_, A, V}) -> {A, V} end,
+    F = fun({_, A, V}) -> {A, V} end,
     Attrs = lists:map(F, H#'SearchResultEntry'.attributes),
-    polish(T,
-	   [#eldap_entry{object_name = ObjectName,
-			 attributes = Attrs}
-	    | Res],
-	   Ref);
-polish([H | T], Res,
-       Ref) ->     % No special treatment of referrals at the moment.
+    polish(
+        T,
+        [
+            #eldap_entry{
+                object_name = ObjectName,
+                attributes = Attrs
+            }
+            | Res
+        ],
+        Ref
+    );
+polish(
+    [H | T],
+    Res,
+    % No special treatment of referrals at the moment.
+    Ref
+) ->
     polish(T, Res, [H | Ref]);
-polish([], Res, Ref) -> {Res, Ref}.
+polish([], Res, Ref) ->
+    {Res, Ref}.
 
 host_tls_options(Host, TLSOpts) ->
     case proplists:get_value(verify, TLSOpts) of
@@ -1042,7 +1299,7 @@ host_tls_options(Host, TLSOpts) ->
             TLSOpts2 = [{server_name_indication, Host} | TLSOpts],
             MatchFun = public_key:pkix_verify_hostname_match_fun(https),
             [{customize_hostname_check, [{match_fun, MatchFun}]} | TLSOpts2];
-         _ ->
+        _ ->
             TLSOpts
     end.
 
@@ -1052,86 +1309,151 @@ host_tls_options(Host, TLSOpts) ->
 connect_bind(S) ->
     Host = next_host(S#eldap.host, S#eldap.hosts),
     HostS = binary_to_list(Host),
-    Opts = if S#eldap.tls == tls ->
-		  [{packet, asn1}, {active, true}, {keepalive, true},
-		   binary
-		   | host_tls_options(HostS, S#eldap.tls_options)];
-	      true ->
-		  [{packet, asn1}, {active, true}, {keepalive, true},
-		   {send_timeout, ?SEND_TIMEOUT}, binary]
-	   end,
-    ?DEBUG("Connecting to LDAP server at ~ts:~p with options ~p",
-	   [Host, S#eldap.port, Opts]),
-    SockMod = case S#eldap.tls of
-		  tls -> ssl;
-		  _ -> gen_tcp
-	      end,
+    Opts =
+        if
+            S#eldap.tls == tls ->
+                [
+                    {packet, asn1},
+                    {active, true},
+                    {keepalive, true},
+                    binary
+                    | host_tls_options(HostS, S#eldap.tls_options)
+                ];
+            true ->
+                [
+                    {packet, asn1},
+                    {active, true},
+                    {keepalive, true},
+                    {send_timeout, ?SEND_TIMEOUT},
+                    binary
+                ]
+        end,
+    ?DEBUG(
+        "Connecting to LDAP server at ~ts:~p with options ~p",
+        [Host, S#eldap.port, Opts]
+    ),
+    SockMod =
+        case S#eldap.tls of
+            tls -> ssl;
+            _ -> gen_tcp
+        end,
     case connect(HostS, S#eldap.port, SockMod, Opts) of
-      {ok, Socket} ->
-	  case bind_request(Socket, S#eldap{sockmod = SockMod}) of
-	    {ok, NewS} ->
-		Timer = erlang:start_timer(?BIND_TIMEOUT, self(),
-					   {timeout, bind_timeout}),
-		{ok, wait_bind_response,
-		 NewS#eldap{fd = Socket, sockmod = SockMod, host = Host,
-			    bind_timer = Timer}};
-	    {error, Reason} ->
-		report_bind_failure(Host, S#eldap.port, Reason),
-		NewS = close_and_retry(S),
-		{ok, connecting, NewS#eldap{host = Host}}
-	  end;
-      {error, Reason} ->
-	  ?ERROR_MSG("LDAP connection to ~ts:~b failed: ~ts",
-		     [Host, S#eldap.port, format_error(SockMod, Reason)]),
-	  NewS = close_and_retry(S),
-	  {ok, connecting, NewS#eldap{host = Host}}
+        {ok, Socket} ->
+            case bind_request(Socket, S#eldap{sockmod = SockMod}) of
+                {ok, NewS} ->
+                    Timer = erlang:start_timer(
+                        ?BIND_TIMEOUT,
+                        self(),
+                        {timeout, bind_timeout}
+                    ),
+                    {ok, wait_bind_response, NewS#eldap{
+                        fd = Socket,
+                        sockmod = SockMod,
+                        host = Host,
+                        bind_timer = Timer
+                    }};
+                {error, Reason} ->
+                    report_bind_failure(Host, S#eldap.port, Reason),
+                    NewS = close_and_retry(S),
+                    {ok, connecting, NewS#eldap{host = Host}}
+            end;
+        {error, Reason} ->
+            ?ERROR_MSG(
+                "LDAP connection to ~ts:~b failed: ~ts",
+                [Host, S#eldap.port, format_error(SockMod, Reason)]
+            ),
+            NewS = close_and_retry(S),
+            {ok, connecting, NewS#eldap{host = Host}}
     end.
 
 bind_request(Socket, S) ->
     Id = bump_id(S),
-    Req = #'BindRequest'{version = S#eldap.version,
-			 name = S#eldap.rootdn,
-			 authentication = {simple, S#eldap.passwd}},
-    Message = #'LDAPMessage'{messageID = Id,
-			     protocolOp = {bindRequest, Req}},
-    ?DEBUG("Bind Request Message:~p~n", [ejabberd_config:may_hide_data(Message)]),
-    {ok, Bytes} = 'ELDAPv3':encode('LDAPMessage', Message),
-    case (S#eldap.sockmod):send(Socket, Bytes) of
-      ok -> {ok, S#eldap{id = Id}};
-      Error -> Error
+    case S#eldap.bind of
+        simple ->
+            Req = #'BindRequest'{
+                version = S#eldap.version,
+                name = S#eldap.rootdn,
+                authentication = {simple, S#eldap.passwd}
+            },
+            Message = #'LDAPMessage'{
+                messageID = Id,
+                protocolOp = {bindRequest, Req}
+            },
+            ?DEBUG("Bind Request Message:~p~n", [ejabberd_config:may_hide_data(Message)]),
+            {ok, Bytes} = 'ELDAPv3':encode('LDAPMessage', Message),
+            case (S#eldap.sockmod):send(Socket, Bytes) of
+                ok -> {ok, S#eldap{id = Id}};
+                Error -> Error
+            end;
+        sasl ->
+            {ok, Krb} = ejabberd_krb_init:start_link(<<"ldap@ldap.nonlocal.cloud">>, sasl),
+            case p1_fsm:sync_send_event(Krb, start) of
+                {ok, NewToken} ->
+                    Req = #'BindRequest'{
+                        version = S#eldap.version,
+                        name = <<>>,
+                        authentication =
+                            {sasl, #'SaslCredentials'{
+                                mechanism = <<"GSSAPI">>,
+                                credentials = NewToken
+                            }}
+                    },
+                    Message = #'LDAPMessage'{
+                        messageID = Id,
+                        protocolOp = {bindRequest, Req}
+                    },
+                    ?DEBUG("Bind Request Message:~p~n", [ejabberd_config:may_hide_data(Message)]),
+                    {ok, Bytes} = 'ELDAPv3':encode('LDAPMessage', Message),
+                    case (S#eldap.sockmod):send(Socket, Bytes) of
+                        ok -> {ok, S#eldap{id = Id, krb = Krb}};
+                        Error -> Error
+                    end;
+                _ ->
+                    {error, "gss failure"}
+            end
     end.
 
 %% Given last tried Server, find next one to try
 next_host(undefined, [H | _]) ->
-    H;                    % First time, take first
-next_host(Host,
-	  Hosts) ->                       % Find next in turn
+    % First time, take first
+    H;
+next_host(
+    Host,
+    % Find next in turn
+    Hosts
+) ->
     next_host(Host, Hosts, Hosts).
 
 next_host(Host, [Host], Hosts) ->
-    hd(Hosts);    % Wrap back to first
+    % Wrap back to first
+    hd(Hosts);
 next_host(Host, [Host | Tail], _Hosts) ->
-    hd(Tail);       % Take next
+    % Take next
+    hd(Tail);
 next_host(_Host, [], Hosts) ->
-    hd(Hosts);       % Never connected before? (shouldn't happen)
+    % Never connected before? (shouldn't happen)
+    hd(Hosts);
 next_host(Host, [_ | T], Hosts) ->
     next_host(Host, T, Hosts).
 
-bump_id(#eldap{id = Id})
-    when Id > (?MAX_TRANSACTION_ID) ->
+bump_id(#eldap{id = Id}) when
+    Id > (?MAX_TRANSACTION_ID)
+->
     ?MIN_TRANSACTION_ID;
-bump_id(#eldap{id = Id}) -> Id + 1.
+bump_id(#eldap{id = Id}) ->
+    Id + 1.
 
 format_error(SockMod, Reason) ->
-    Txt = case SockMod of
-	      ssl -> ssl:format_error(Reason);
-	      gen_tcp -> inet:format_error(Reason)
-	  end,
+    Txt =
+        case SockMod of
+            ssl -> ssl:format_error(Reason);
+            gen_tcp -> inet:format_error(Reason)
+        end,
     case Txt of
-	"unknown POSIX error" ->
-	    lists:flatten(io_lib:format("~p", [Reason]));
-	_ ->
-	    Txt
+        "unknown POSIX error" ->
+            lists:flatten(io_lib:format("~p", [Reason]));
+        _ ->
+            Txt
     end.
 
 %%--------------------------------------------------------------------
@@ -1142,41 +1464,46 @@ format_error(SockMod, Reason) ->
 
 connect(Host, Port, Mod, Opts) ->
     case lookup(Host) of
-	{ok, AddrsFamilies} ->
-	    do_connect(AddrsFamilies, Port, Mod, Opts, {error, nxdomain});
-	{error, _} = Err ->
-	    Err
+        {ok, AddrsFamilies} ->
+            do_connect(AddrsFamilies, Port, Mod, Opts, {error, nxdomain});
+        {error, _} = Err ->
+            Err
     end.
 
-do_connect([{IP, Family}|AddrsFamilies], Port, Mod, Opts, _Err) ->
-    case Mod:connect(IP, Port, [Family|Opts], ?CONNECT_TIMEOUT) of
-	{ok, Sock} ->
-	    {ok, Sock};
-	{error, _} = Err ->
-	    do_connect(AddrsFamilies, Port, Mod, Opts, Err)
+do_connect([{IP, Family} | AddrsFamilies], Port, Mod, Opts, _Err) ->
+    case Mod:connect(IP, Port, [Family | Opts], ?CONNECT_TIMEOUT) of
+        {ok, Sock} ->
+            {ok, Sock};
+        {error, _} = Err ->
+            do_connect(AddrsFamilies, Port, Mod, Opts, Err)
     end;
 do_connect([], _Port, _Mod, _Opts, Err) ->
     Err.
 
 lookup(Host) ->
     case inet:parse_address(Host) of
-	{ok, IP} ->
-	    {ok, [{IP, get_addr_type(IP)}]};
-	{error, _} ->
-	    do_lookup([{Host, Family} || Family <- [inet6, inet]],
-		      [], {error, nxdomain})
+        {ok, IP} ->
+            {ok, [{IP, get_addr_type(IP)}]};
+        {error, _} ->
+            do_lookup(
+                [{Host, Family} || Family <- [inet6, inet]],
+                [],
+                {error, nxdomain}
+            )
     end.
 
-do_lookup([{Host, Family}|HostFamilies], AddrFamilies, Err) ->
+do_lookup([{Host, Family} | HostFamilies], AddrFamilies, Err) ->
     case inet:gethostbyname(Host, Family, ?DNS_TIMEOUT) of
-	{ok, HostEntry} ->
-	    Addrs = host_entry_to_addrs(HostEntry),
-	    AddrFamilies1 = [{Addr, Family} || Addr <- Addrs],
-	    do_lookup(HostFamilies,
-		      AddrFamilies ++ AddrFamilies1,
-		      Err);
-	{error, _} = Err1 ->
-	    do_lookup(HostFamilies, AddrFamilies, Err1)
+        {ok, HostEntry} ->
+            Addrs = host_entry_to_addrs(HostEntry),
+            AddrFamilies1 = [{Addr, Family} || Addr <- Addrs],
+            do_lookup(
+                HostFamilies,
+                AddrFamilies ++ AddrFamilies1,
+                Err
+            );
+        {error, _} = Err1 ->
+            do_lookup(HostFamilies, AddrFamilies, Err1)
     end;
 do_lookup([], [], Err) ->
     Err;
@@ -1185,13 +1512,16 @@ do_lookup([], AddrFamilies, _Err) ->
 
 host_entry_to_addrs(#hostent{h_addr_list = AddrList}) ->
     lists:filter(
-      fun(Addr) ->
-	      try get_addr_type(Addr) of
-		  _ -> true
-	      catch _:badarg ->
-		      false
-	      end
-      end, AddrList).
+        fun(Addr) ->
+            try get_addr_type(Addr) of
+                _ -> true
+            catch
+                _:badarg ->
+                    false
+            end
+        end,
+        AddrList
+    ).
 
 get_addr_type({_, _, _, _}) -> inet;
 get_addr_type({_, _, _, _, _, _, _, _}) -> inet6;
