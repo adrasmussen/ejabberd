@@ -453,6 +453,7 @@ sasl_mechanisms(Mechs, #{lserver := LServer, stream_encrypted := Encrypted} = St
 	   (<<"PLAIN">>) -> true;
 	   (<<"X-OAUTH2">>) -> [ejabberd_auth_anonymous] /= ejabberd_auth:auth_modules(LServer);
 	   (<<"EXTERNAL">>) -> maps:get(tls_verify, State, false);
+	   (<<"GSSAPI">>) -> true;
 	   (_) -> false
 	end, Mechs -- Mechs1),
     case ejabberd_option:auth_password_types_hidden_in_sasl1() of

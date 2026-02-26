@@ -115,13 +115,14 @@ defmodule Ejabberd.MixProject do
      {:fast_xml, "~> 1.1.56"},
      {:fast_yaml, "~> 1.0"},
      {:idna, "~> 6.0"},
+     {:kerlberos, path: "../kerlberos", manager: :rebar3, override: true},
      {:mqtree, "~> 1.0"},
      {:p1_acme, ">= 1.0.28"},
      {:p1_oauth2, "~> 0.6"},
      {:p1_utils, "~> 1.0"},
      {:pkix, "~> 1.0"},
      {:stringprep, ">= 1.0.26"},
-     {:xmpp, ">= 1.12.0"},
+     {:xmpp, path: "../p1_xmpp", manager: :rebar3},
      {:yconf, ">= 1.0.22"}]
     ++ cond_deps()
   end

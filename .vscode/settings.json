@@ -1,5 +1,5 @@
 {
-    "editor.tabSize": 8,
+    "editor.tabSize": 4,
     "remote.portsAttributes": {
         "1883": {"label": "MQTT", "onAutoForward": "silent"},
         "4369": {"label": "EPMD", "onAutoForward": "silent"},
@@ -9,5 +9,6 @@
         "5280": {"label": "HTTP", "onAutoForward": "silent"},
         "5443": {"label": "HTTPS", "onAutoForward": "silent"},
         "7777": {"label": "XMPP SOCKS5 (proxy65)", "onAutoForward": "silent"}
-    }
+},
+"editor.detectIndentation": false
 }
