@@ -1408,8 +1408,8 @@ bind_request(Socket, S) ->
                         ok -> {ok, S#eldap{id = Id, krb = Krb}};
                         Error -> Error
                     end;
-                _ ->
-                    {error, "gss failure"}
+                {'EXIT', Reason} ->
+                    {error, Reason}
             end
     end.
 
