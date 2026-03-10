@@ -22,13 +22,12 @@
 
 -record(?MODULE, {
     mode :: mode(),
-    realm :: krb_realm:realm(),
     ticket :: krb_proto:ticket(),
     gss_context = none :: gss_mechanism:state() | none
 }).
 
 % this could be extended to have per-call or per-host creds
-% (and in fact that flexibily is why we use a dedicated krb5
+% (and in fact that flexibility is why we use a dedicated krb5
 % library instead of a libgssapi wrapper), but for a first
 % pass we just use configured defaults
 %
@@ -40,30 +39,13 @@
 -spec start_link(binary(), mode()) -> pid().
 start_link(Target, Mode) ->
     Reg_name = misc:binary_to_atom(
-        list_to_binary([<<"krb_init_">>, erlang:ref_to_list(make_ref())])
+        list_to_binary([<<"ejabberd_krb_init_">>, erlang:ref_to_list(make_ref())])
     ),
     p1_fsm:start_link({local, Reg_name}, ?MODULE, [Target, Mode], []).
 
 init([Target, Mode]) ->
-    % the krb_sup should have already been started
-    {ok, Realm} = krb_realm:open("NONLOCAL.CLOUD"),
-
-    % if we wanted to search the keytab for a specific
-    % principal, we would do so here
-    {ok, [KeyTab | _]} = krb_mit_keytab:file("/etc/client.keytab"),
-    #{principal := Principal, key := Key} = KeyTab,
-
-    {ok, TGT} = krb_realm:authenticate_keytab(Realm, Principal, Key),
-
-    % there are other representations but we are bypassing libgssapi
-    % and the NT host service is unambiguous for a single realm
-    [TargetService, TargetHost] = string:split(Target, "@"),
-
-    {ok, Ticket} = krb_realm:obtain_ticket(Realm, TGT, [TargetService, TargetHost]),
-
-    % even though kerberos gssapi mech goes first, we don't have an
-    % easy way to get the caller's pid in here
-    {ok, ready, #?MODULE{mode = Mode, realm = Realm, ticket = Ticket, gss_context = none}}.
+    {ok, Ticket} = ejabberd_krb_cache:remote_creds(Target),
+    {ok, ready, #?MODULE{mode = Mode, ticket = Ticket, gss_context = none}}.
 
 ready(start, From, S) ->
     % initiate can also return {ok, Ctx} and {error, _}, which
